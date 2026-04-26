@@ -2,9 +2,11 @@ export type ItemType =
   | "Partido"
   | "Vuelo"
   | "Airbnb"
+  | "Vale"
   | "Transporte"
   | "Comida"
   | "Actividad"
+  | "Bar"
   | "Otro";
 
 export type Person = "Roy" | "Acompañante" | "Ambos";
@@ -29,6 +31,7 @@ export type Item = {
   resalePrice?: number;
   resaleQuantity?: number;
   resaleFeePct?: number;
+  notes?: string;
 };
 
 export type Trip = {
