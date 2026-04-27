@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Item } from "../types/trip";
+import { Item, ItemType } from "../types/trip";
 
 type Props = {
   city: string;
@@ -32,7 +32,7 @@ export default function TripView({
   updateItem,
   deleteItem,
 }: Props) {
-  const [type, setType] = useState("Partido");
+  const [type, setType] = useState<ItemType>("Partido");
   const [title, setTitle] = useState("");
   const [cost, setCost] = useState(0);
   const [match, setMatch] = useState<number | "">("");
@@ -42,9 +42,11 @@ export default function TripView({
 
   function handleAdd() {
     let finalAddress = address;
+    let stadiumName = "";
 
     if (type === "Partido" && match && stadiums[match]) {
       finalAddress = stadiums[match].address;
+      stadiumName = stadiums[match].name;
     }
 
     addItem({
@@ -54,9 +56,12 @@ export default function TripView({
       city,
       cost,
       quantity: 1,
-      match: typeof match === "number" ? match : undefined,
-      address: finalAddress,
+      matchNumber: typeof match === "number" ? match : undefined,
+      stadium: stadiumName || undefined,
+      stadiumAddress: type === "Partido" ? finalAddress : undefined,
+      airbnbAddress: type === "Airbnb" ? finalAddress : undefined,
       paid: false,
+      paidBy: "Ambos",
     });
 
     setTitle("");
@@ -75,7 +80,7 @@ export default function TripView({
           <select
             className="rounded-xl border p-3"
             value={type}
-            onChange={(e) => setType(e.target.value)}
+            onChange={(e) => setType(e.target.value as ItemType)}
           >
             <option>Partido</option>
             <option>Vuelo</option>
@@ -106,7 +111,6 @@ export default function TripView({
           </button>
         </div>
 
-        {/* PARTIDO INPUT */}
         {type === "Partido" && (
           <input
             type="number"
@@ -117,7 +121,6 @@ export default function TripView({
           />
         )}
 
-        {/* AIRBNB INPUT */}
         {type === "Airbnb" && (
           <input
             placeholder="Pega link o dirección"
@@ -127,7 +130,6 @@ export default function TripView({
           />
         )}
 
-        {/* ITEMS */}
         <div className="mt-6 space-y-3">
           {items.map((item) => (
             <div
@@ -140,14 +142,18 @@ export default function TripView({
                 </p>
                 <h3 className="text-xl font-black">{item.title}</h3>
 
-                {item.match && (
+                {item.matchNumber && (
                   <p className="text-sm text-gray-500">
-                    Partido #{item.match} · {item.address}
+                    Partido #{item.matchNumber} · {item.stadiumAddress}
                   </p>
                 )}
 
-                {item.address && !item.match && (
-                  <p className="text-sm text-gray-500">{item.address}</p>
+                {item.airbnbAddress && (
+                  <input
+                    value={item.airbnbAddress}
+                    onChange={(e) => updateItem(item.id, { airbnbAddress: e.target.value })}
+                    className="mt-2 w-full rounded-xl border p-2 text-sm text-slate-700"
+                  />
                 )}
               </div>
 
@@ -174,13 +180,11 @@ export default function TripView({
           ))}
         </div>
 
-        {/* TOTAL */}
         <div className="mt-6 text-2xl font-black">
           Total: {money(total)}
         </div>
       </div>
 
-      {/* RIGHT PANEL */}
       <div className="rounded-[32px] bg-sky-500 text-white p-6">
         <h3 className="text-2xl font-black">Rutas</h3>
         <p className="mt-2 text-sm opacity-80">
