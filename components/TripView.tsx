@@ -6,6 +6,10 @@ import { Item, ItemType } from "../types/trip";
 type Props = {
   city: string;
   items: Item[];
+  airportAddress?: string;
+  airbnbAddress?: string;
+  stadiumAddress?: string;
+  barZone?: string;
   addItem: (item: Item) => void;
   updateItem: (id: number, updates: Partial<Item>) => void;
   deleteItem: (id: number) => void;
@@ -25,9 +29,17 @@ function money(n: number) {
   });
 }
 
+function mapsSearch(query: string) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
 export default function TripView({
   city,
   items,
+  airportAddress,
+  airbnbAddress,
+  stadiumAddress,
+  barZone,
   addItem,
   updateItem,
   deleteItem,
@@ -39,6 +51,9 @@ export default function TripView({
   const [address, setAddress] = useState("");
 
   const total = items.reduce((acc, i) => acc + i.cost * i.quantity, 0);
+  const itemAirbnbAddress = items.find((item) => item.airbnbAddress)?.airbnbAddress;
+  const baseLocation = airbnbAddress || itemAirbnbAddress || city;
+  const destinationStadium = stadiumAddress || items.find((item) => item.stadiumAddress)?.stadiumAddress;
 
   function handleAdd() {
     let finalAddress = address;
@@ -54,7 +69,7 @@ export default function TripView({
       type,
       title: title || type,
       city,
-      cost,
+      cost: Math.max(0, cost),
       quantity: 1,
       matchNumber: typeof match === "number" ? match : undefined,
       stadium: stadiumName || undefined,
@@ -72,7 +87,6 @@ export default function TripView({
 
   return (
     <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
-      {/* LEFT */}
       <div className="rounded-[32px] bg-white p-6 shadow-xl">
         <h2 className="text-3xl font-black">{city}</h2>
 
@@ -86,6 +100,10 @@ export default function TripView({
             <option>Vuelo</option>
             <option>Airbnb</option>
             <option>Bar</option>
+            <option>Transporte</option>
+            <option>Comida</option>
+            <option>Actividad</option>
+            <option>Otro</option>
           </select>
 
           <input
@@ -97,6 +115,7 @@ export default function TripView({
 
           <input
             type="number"
+            min="0"
             className="rounded-xl border p-3"
             placeholder="Costo"
             value={cost}
@@ -117,7 +136,7 @@ export default function TripView({
             placeholder="Número de partido"
             className="mt-3 w-full rounded-xl border p-3"
             value={match}
-            onChange={(e) => setMatch(Number(e.target.value))}
+            onChange={(e) => setMatch(e.target.value ? Number(e.target.value) : "")}
           />
         )}
 
@@ -160,14 +179,21 @@ export default function TripView({
               <div className="flex items-center gap-3">
                 <input
                   type="number"
+                  min="0"
                   value={item.cost}
-                  onChange={(e) =>
-                    updateItem(item.id, { cost: Number(e.target.value) })
-                  }
+                  onChange={(e) => updateItem(item.id, { cost: Math.max(0, Number(e.target.value)) })}
                   className="w-24 rounded-xl border p-2"
                 />
 
-                <p className="font-black">{money(item.cost)}</p>
+                <input
+                  type="number"
+                  min="1"
+                  value={item.quantity}
+                  onChange={(e) => updateItem(item.id, { quantity: Math.max(1, Number(e.target.value)) })}
+                  className="w-20 rounded-xl border p-2"
+                />
+
+                <p className="font-black">{money(item.cost * item.quantity)}</p>
 
                 <button
                   onClick={() => deleteItem(item.id)}
@@ -186,15 +212,35 @@ export default function TripView({
       </div>
 
       <div className="rounded-[32px] bg-sky-500 text-white p-6">
-        <h3 className="text-2xl font-black">Rutas</h3>
+        <h3 className="text-2xl font-black">Rutas y recomendaciones</h3>
         <p className="mt-2 text-sm opacity-80">
-          Próximo paso: conectar rutas reales con Google Maps
+          Links rápidos basados en la ubicación del Airbnb o la ciudad activa.
         </p>
 
-        <div className="mt-4 bg-white/20 p-4 rounded-xl">
-          Aeropuerto → Airbnb  
-          Airbnb → Estadio  
-          Airbnb → Bares
+        <div className="mt-4 space-y-3 rounded-xl bg-white/20 p-4 text-sm font-bold">
+          {airportAddress && (
+            <a className="block" href={mapsSearch(`${airportAddress} to ${baseLocation}`)} target="_blank">
+              Aeropuerto → Airbnb
+            </a>
+          )}
+
+          {destinationStadium && (
+            <a className="block" href={mapsSearch(`${baseLocation} to ${destinationStadium}`)} target="_blank">
+              Airbnb → Estadio
+            </a>
+          )}
+
+          <a className="block" href={mapsSearch(`restaurantes cerca de ${baseLocation}`)} target="_blank">
+            Restaurantes cercanos
+          </a>
+
+          <a className="block" href={mapsSearch(barZone || `bares cerca de ${baseLocation}`)} target="_blank">
+            Bares cercanos
+          </a>
+
+          <a className="block" href={mapsSearch(`lugares turísticos cerca de ${baseLocation}`)} target="_blank">
+            Lugares turísticos
+          </a>
         </div>
       </div>
     </div>
