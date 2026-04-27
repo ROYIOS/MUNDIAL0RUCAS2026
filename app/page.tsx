@@ -4,7 +4,7 @@ import { useState } from "react";
 import CityTabs from "../components/CityTabs";
 import TripView from "../components/TripView";
 import { useTrips } from "../lib/store";
-import { Item } from "../types/trip";
+import { Item, Trip } from "../types/trip";
 
 function money(n: number) {
   return n.toLocaleString("es-MX", {
@@ -15,7 +15,7 @@ function money(n: number) {
 }
 
 export default function Home() {
-  const { trips, addItem, updateItem, deleteItem } = useTrips();
+  const { trips, addItem, updateItem, deleteItem, updateTrip } = useTrips();
   const [activeCity, setActiveCity] = useState("Dallas");
 
   if (!trips.length) {
@@ -114,19 +114,15 @@ export default function Home() {
         </div>
 
         <TripView
-          city={current.city}
-          items={current.items}
-          airportAddress={current.airportAddress}
-          airbnbAddress={current.airbnbAddress}
-          stadiumAddress={current.stadiumAddress}
-          barZone={current.barZone}
+          trip={current}
           addItem={(item: Item) => addItem(current.city, item)}
-          updateItem={(id: number, updates: Partial<Item>) => {
-            Object.entries(updates).forEach(([field, value]) => {
-              updateItem(current.city, id, field as keyof Item, value);
-            });
-          }}
+          updateItem={(id: number, field: keyof Item, value: any) =>
+            updateItem(current.city, id, field, value)
+          }
           deleteItem={(id: number) => deleteItem(current.city, id)}
+          updateTrip={(field: keyof Trip, value: string) =>
+            updateTrip(current.city, field, value)
+          }
         />
       </section>
     </main>
