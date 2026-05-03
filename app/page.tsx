@@ -123,6 +123,9 @@ export default function Home() {
           updateTrip={(field: keyof Trip, value: string) =>
             updateTrip(current.city, field, value)
           }
+          saveRoute={() => {}}
+          deleteRoute={() => {}}
+          saveRecommendedPlaces={() => {}}
         />
       </section>
     </main>
