@@ -14,21 +14,14 @@ type Props = {
   saveRecommendedPlaces?: (...args: any[]) => void;
 };
 
-function money(n: number) {
-  return n.toLocaleString("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    maximumFractionDigits: 0,
-  });
-}
+const money = (n: number) =>
+  n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 
-function mapsSearch(query: string) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-}
+const mapsSearch = (q: string) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 
-function directions(origin: string, destination: string) {
-  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
-}
+const directions = (o: string, d: string) =>
+  `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(o)}&destination=${encodeURIComponent(d)}`;
 
 export default function TripView({ trip, addItem, updateItem, deleteItem, updateTrip }: Props) {
   const [type, setType] = useState<ItemType>("Partido");
@@ -37,40 +30,49 @@ export default function TripView({ trip, addItem, updateItem, deleteItem, update
   const [quantity, setQuantity] = useState(1);
   const [paidBy, setPaidBy] = useState<Person>("Ambos");
   const [date, setDate] = useState("");
+  const [notes, setNotes] = useState("");
 
-  const total = trip.items.reduce((acc, i) => acc + i.cost * i.quantity, 0);
-  const paid = trip.items.reduce((acc, i) => acc + (i.paid ? i.cost * i.quantity : 0), 0);
+  const total = useMemo(() => trip.items.reduce((a, i) => a + i.cost * i.quantity, 0), [trip.items]);
+  const paid = useMemo(() => trip.items.reduce((a, i) => a + (i.paid ? i.cost * i.quantity : 0), 0), [trip.items]);
   const pending = total - paid;
 
-  const byPerson = useMemo(() => {
-    const split = { Roy: 0, Acompañante: 0 };
-    for (const item of trip.items) {
-      const amount = item.cost * item.quantity;
-      if (item.paidBy === "Roy") split.Roy += amount;
-      else if (item.paidBy === "Acompañante") split.Acompañante += amount;
+  const split = useMemo(() => {
+    const out = { Roy: 0, Acompañante: 0 };
+    for (const i of trip.items) {
+      const amount = i.cost * i.quantity;
+      if (i.paidBy === "Roy") out.Roy += amount;
+      else if (i.paidBy === "Acompañante") out.Acompañante += amount;
       else {
-        split.Roy += amount / 2;
-        split.Acompañante += amount / 2;
+        out.Roy += amount / 2;
+        out.Acompañante += amount / 2;
       }
     }
-    return split;
+    return out;
   }, [trip.items]);
 
-  const nextFlight = useMemo(() => {
-    const flights = trip.items.filter((item) => item.type === "Vuelo");
-    return flights.sort((a, b) => (a.flightDate || "9999").localeCompare(b.flightDate || "9999"))[0];
-  }, [trip.items]);
+  const nextFlight = useMemo(
+    () =>
+      trip.items
+        .filter((i) => i.type === "Vuelo")
+        .sort((a, b) => (a.flightDate || "9999-12-31").localeCompare(b.flightDate || "9999-12-31"))[0],
+    [trip.items]
+  );
 
-  const nextEvent = useMemo(() => {
-    const events = trip.items.filter((item) => item.type !== "Vuelo");
-    return events.sort((a, b) => (a.eventDate || "9999").localeCompare(b.eventDate || "9999"))[0];
-  }, [trip.items]);
+  const nextEvent = useMemo(
+    () =>
+      trip.items
+        .filter((i) => i.type !== "Vuelo")
+        .sort((a, b) => (a.eventDate || "9999-12-31").localeCompare(b.eventDate || "9999-12-31"))[0],
+    [trip.items]
+  );
+
+  const baseLocation = trip.airbnbAddress || trip.city;
 
   function handleAdd() {
     addItem({
       id: Date.now(),
       type,
-      title: title || type,
+      title: title.trim() || type,
       city: trip.city,
       cost: Math.max(0, cost),
       quantity: Math.max(1, quantity),
@@ -78,50 +80,55 @@ export default function TripView({ trip, addItem, updateItem, deleteItem, update
       paidBy,
       flightDate: type === "Vuelo" ? date || undefined : undefined,
       eventDate: type !== "Vuelo" ? date || undefined : undefined,
+      notes: notes || undefined,
     });
+
     setTitle("");
     setCost(0);
     setQuantity(1);
     setDate("");
+    setNotes("");
+    setPaidBy("Ambos");
   }
-
-  const baseLocation = trip.airbnbAddress || trip.city;
-  const barQuery = trip.barZone || `bares cerca de ${baseLocation}`;
 
   return (
     <div className="mt-6 space-y-6">
-      <section className="grid gap-4 md:grid-cols-4">
-        <article className="rounded-3xl bg-white p-5 shadow">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Separación de gastos</p>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <article className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100">
+          <p className="text-xs uppercase font-bold text-slate-400 tracking-widest">Total</p>
           <p className="mt-2 text-2xl font-black">{money(total)}</p>
-          <p className="text-emerald-600 font-bold">Pagado: {money(paid)}</p>
-          <p className="text-orange-500 font-bold">Pendiente: {money(pending)}</p>
         </article>
 
-        <article className="rounded-3xl bg-white p-5 shadow">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Pagado por Roy</p>
-          <p className="mt-2 text-2xl font-black">{money(byPerson.Roy)}</p>
+        <article className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100">
+          <p className="text-xs uppercase font-bold text-slate-400 tracking-widest">Pagado</p>
+          <p className="mt-2 text-2xl font-black text-emerald-600">{money(paid)}</p>
+          <p className="text-xs text-slate-500">Pendiente: {money(pending)}</p>
         </article>
 
-        <article className="rounded-3xl bg-white p-5 shadow">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Pagado acompañante</p>
-          <p className="mt-2 text-2xl font-black">{money(byPerson.Acompañante)}</p>
+        <article className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100">
+          <p className="text-xs uppercase font-bold text-slate-400 tracking-widest">Roy</p>
+          <p className="mt-2 text-2xl font-black">{money(split.Roy)}</p>
         </article>
 
-        <article className="rounded-3xl bg-sky-500 p-5 text-white shadow">
-          <p className="text-xs font-bold uppercase tracking-widest text-sky-100">Próximo vuelo</p>
-          <p className="mt-2 text-xl font-black">{nextFlight ? nextFlight.title : "Sin vuelo"}</p>
-          {nextFlight?.flightDate && <p className="text-sm">{nextFlight.flightDate}</p>}
-          <p className="mt-3 text-xs font-bold uppercase tracking-widest text-sky-100">Próximo evento</p>
-          <p className="mt-1 text-lg font-black">{nextEvent ? nextEvent.title : "Sin evento"}</p>
-          {nextEvent?.eventDate && <p className="text-sm">{nextEvent.eventDate}</p>}
+        <article className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100">
+          <p className="text-xs uppercase font-bold text-slate-400 tracking-widest">Acompañante</p>
+          <p className="mt-2 text-2xl font-black">{money(split.Acompañante)}</p>
+        </article>
+
+        <article className="rounded-3xl bg-gradient-to-br from-sky-500 to-cyan-500 p-5 text-white shadow-lg">
+          <p className="text-xs uppercase font-bold text-sky-100">Próximos</p>
+          <p className="mt-2 text-sm">Vuelo: {nextFlight?.title || "Sin vuelo"}</p>
+          <p className="text-xs">{nextFlight?.flightDate || "Sin fecha"}</p>
+          <p className="mt-2 text-sm">Evento: {nextEvent?.title || "Sin evento"}</p>
+          <p className="text-xs">{nextEvent?.eventDate || "Sin fecha"}</p>
         </article>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <div className="rounded-[32px] bg-white p-6 shadow-xl">
+        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100">
           <h2 className="text-3xl font-black">{trip.city}</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-6">
+
+          <div className="mt-5 grid gap-3 md:grid-cols-6">
             <select className="rounded-xl border p-3" value={type} onChange={(e) => setType(e.target.value as ItemType)}>
               <option>Partido</option><option>Vuelo</option><option>Airbnb</option><option>Bar</option><option>Transporte</option><option>Comida</option><option>Actividad</option><option>Otro</option>
             </select>
@@ -129,51 +136,52 @@ export default function TripView({ trip, addItem, updateItem, deleteItem, update
             <input type="number" min="0" className="rounded-xl border p-3" placeholder="Costo" value={cost} onChange={(e) => setCost(Number(e.target.value))} />
             <input type="number" min="1" className="rounded-xl border p-3" placeholder="Cant." value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
             <input type="date" className="rounded-xl border p-3" value={date} onChange={(e) => setDate(e.target.value)} />
-            <button onClick={handleAdd} className="rounded-xl bg-sky-500 text-white font-bold">Agregar</button>
+            <button onClick={handleAdd} className="rounded-xl bg-sky-500 text-white font-bold">Guardar</button>
           </div>
 
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
             <select className="rounded-xl border p-3" value={paidBy} onChange={(e) => setPaidBy(e.target.value as Person)}>
               <option value="Ambos">Paga: Ambos</option>
               <option value="Roy">Paga: Roy</option>
               <option value="Acompañante">Paga: Acompañante</option>
             </select>
-            <input className="rounded-xl border p-3" placeholder="Zona de bares (Google)" value={trip.barZone} onChange={(e) => updateTrip("barZone", e.target.value)} />
+            <input className="rounded-xl border p-3 md:col-span-2" placeholder="Notas" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
 
           <div className="mt-6 space-y-3">
             {trip.items.map((item) => (
-              <div key={item.id} className="rounded-2xl border p-4 flex flex-wrap justify-between items-center gap-3">
-                <div>
-                  <p className="text-xs text-sky-500 font-bold uppercase">{item.type}</p>
-                  <h3 className="text-xl font-black">{item.title}</h3>
-                  {(item.flightDate || item.eventDate) && <p className="text-sm text-slate-500">{item.flightDate || item.eventDate}</p>}
+              <article key={item.id} className="rounded-2xl border p-4 bg-slate-50/60">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase font-bold text-sky-600">{item.type}</p>
+                    <h3 className="text-lg font-black">{item.title}</h3>
+                  </div>
+                  <button onClick={() => deleteItem(item.id)} className="text-red-500 font-bold">Eliminar</button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input type="number" min="0" value={item.cost} onChange={(e) => updateItem(item.id, "cost", Math.max(0, Number(e.target.value)))} className="w-24 rounded-xl border p-2" />
-                  <input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(item.id, "quantity", Math.max(1, Number(e.target.value)))} className="w-20 rounded-xl border p-2" />
-                  <select value={item.paidBy} onChange={(e) => updateItem(item.id, "paidBy", e.target.value as Person)} className="rounded-xl border p-2 text-sm">
+
+                <div className="mt-3 grid gap-2 md:grid-cols-6">
+                  <input type="number" min="0" value={item.cost} onChange={(e) => updateItem(item.id, "cost", Math.max(0, Number(e.target.value)))} className="rounded-xl border p-2" />
+                  <input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(item.id, "quantity", Math.max(1, Number(e.target.value)))} className="rounded-xl border p-2" />
+                  <select value={item.paidBy} onChange={(e) => updateItem(item.id, "paidBy", e.target.value as Person)} className="rounded-xl border p-2">
                     <option value="Ambos">Ambos</option><option value="Roy">Roy</option><option value="Acompañante">Acompañante</option>
                   </select>
-                  <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={item.paid} onChange={(e) => updateItem(item.id, "paid", e.target.checked)} /> Pagado</label>
-                  <p className="font-black">{money(item.cost * item.quantity)}</p>
-                  <button onClick={() => deleteItem(item.id)} className="text-red-500">✕</button>
+                  <label className="rounded-xl border p-2 text-sm"><input type="checkbox" checked={item.paid} onChange={(e) => updateItem(item.id, "paid", e.target.checked)} /> Pagado</label>
+                  <input type="date" value={item.type === "Vuelo" ? item.flightDate || "" : item.eventDate || ""} onChange={(e) => updateItem(item.id, item.type === "Vuelo" ? "flightDate" : "eventDate", e.target.value)} className="rounded-xl border p-2" />
+                  <div className="rounded-xl border p-2 font-black text-right">{money(item.cost * item.quantity)}</div>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
-        </div>
+        </section>
 
-        <aside className="rounded-[32px] bg-sky-500 text-white p-6">
-          <h3 className="text-2xl font-black">Google Travel API (Maps)</h3>
-          <p className="mt-2 text-sm opacity-80">Búsquedas y rutas directas en Google Maps para bares, restaurantes y traslados.</p>
-          <div className="mt-4 space-y-2 rounded-xl bg-white/20 p-4 text-sm font-bold">
-            <a className="block" href={mapsSearch(barQuery)} target="_blank">🍸 Bares cercanos</a>
-            <a className="block" href={mapsSearch(`restaurantes cerca de ${baseLocation}`)} target="_blank">🍽️ Restaurantes cercanos</a>
-            <a className="block" href={mapsSearch(`lugares turísticos cerca de ${baseLocation}`)} target="_blank">📍 Lugares turísticos</a>
-            <a className="block" href={directions(trip.airportAddress || trip.city, baseLocation)} target="_blank">✈️ Aeropuerto → Hospedaje</a>
-            {trip.stadiumAddress && <a className="block" href={directions(baseLocation, trip.stadiumAddress)} target="_blank">🏟️ Hospedaje → Estadio</a>}
+        <aside className="rounded-3xl bg-slate-900 p-6 text-white">
+          <h3 className="text-2xl font-black">Google tools</h3>
+          <div className="mt-4 space-y-2 text-sm font-bold">
+            <a className="block rounded-xl bg-white/10 px-3 py-2" href={mapsSearch(trip.barZone || `bares cerca de ${baseLocation}`)} target="_blank">🍸 Bares</a>
+            <a className="block rounded-xl bg-white/10 px-3 py-2" href={mapsSearch(`restaurantes cerca de ${baseLocation}`)} target="_blank">🍽️ Restaurantes</a>
+            <a className="block rounded-xl bg-white/10 px-3 py-2" href={directions(trip.airportAddress || trip.city, baseLocation)} target="_blank">✈️ Aeropuerto→Hospedaje</a>
           </div>
+          <input className="mt-4 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2" value={trip.barZone} onChange={(e) => updateTrip("barZone", e.target.value)} placeholder="Zona de bares" />
         </aside>
       </div>
     </div>
